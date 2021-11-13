@@ -8,7 +8,7 @@
 LiquidCrystal_I2C lcd(0x20,16,2); 
 
 //defining buttons
-#define btOk   5
+#define btOk     5
 #define btMode   4
 #define btUp     3
 #define btDown   2
@@ -22,6 +22,12 @@ LiquidCrystal_I2C lcd(0x20,16,2);
 
 //Tempurature sensor
 #define ONE_WIRE_BUS 6  //pin 6 of arduino
+
+//Value for blinking
+
+bool blinkMode = true;
+unsigned long previousTimeBlink = 0;  //this value use for blinking
+int blinkInterval=200;
 
 //weight details
 
@@ -39,6 +45,20 @@ DallasTemperature sensors(&oneWire);
 DeviceAddress insideThermometer;
 
 /*----------------------------------------------------------Variables---------------------------------------------*/
+
+//-----------------------Variables to switch screens---------------------------------------------
+int menuMode=0; //indicate menu or workingscreen
+int menuSelectionOption=0;  //select main menu from list
+int menuLevel1=0; //indicates which number of the submenu #1 selected
+int menuLevel2=0; //indicates which number of the submenu #2 selected
+int setTimePositionSettings =0; //set time position
+int setTimePositionFeeder=0; //feeder set time position
+int setDatePositionSettings = 0; ////set date position
+
+
+
+
+
 
 //-----------------------Eeprom Store Variable (EEP variable adresses )--------------------------
 
@@ -69,15 +89,17 @@ int eep_feedSlotsMeridiem[5] = {62,63,64,65,66};
 
 uint8_t eep_manualMode = 67;
 uint8_t eep_isSaved = 68;
+uint8_t eep_calibratingFactor = 69;
 
 
 
 
 //----------------------- Variable for saving value from EEPROM --------------------------
 int intFoodPerServe=1234;
+int calibratingFactor;
 
 //set clock
-int hr = 1, min = 30, sec = 55, day = 0, month = 0, year=0 ,  meridiemNumberSetTime=1;  // hour , minute , second ,date , month ,year
+int hr = 1, min = 30, sec = 55, day = 8, month = 11, year=21 ,  meridiemNumberSetTime=1;  // hour , minute , second ,date , month ,year
 char *meridiemName[2] = { "AM", "PM"};
 
 //Heat sensor settings
@@ -113,6 +135,7 @@ int isSaved = 1;
 //----------------------- Values from sensors --------------------------
 
 int foodWeight; //inGrams
+float heatValueC; //inCelcius
 
 
 
@@ -132,11 +155,11 @@ void setup()
   pinMode(weightPin,INPUT);
 
   //External inturrupts
-  //attachInterrupt(digitalPinToInterrupt(btUp),pressUp,LOW);
-  //attachInterrupt(digitalPinToInterrupt(btDown),pressDown,LOW);
+  //attachInterrupt(digitalPinToInterrupt(btUp),buttonActivity,LOW);
+  //attachInterrupt(digitalPinToInterrupt(btDown),buttonActivity,LOW);
   
-  
-  readEEPROM();
+  //writeEEPROM();
+  //readEEPROM();
   
   lcd.print("Welcome");
   lcd.clear();
@@ -149,9 +172,9 @@ void setup()
 }
 void loop()
 {
-  //getWeightSensorReadings();
-  getTempuratureSensorReadings();
-  
+ buttonActivity();
+ changeScreens();
+ toggleBlinkModeValue();  
 }
 
 /*-------------------------------------------Button Functions---------------------------------------*/
@@ -182,7 +205,7 @@ void printCalibrateScale(){
   lcd.print("Set 0g->press OK");
 }
 
-/******************Main Menu*************************/
+/**************************Main Menu**********************************/
 void printMainMenu1(){
   
   lcd.setCursor(0,0);
@@ -190,7 +213,8 @@ void printMainMenu1(){
   lcd.setCursor(0,1);
   lcd.print("Feed Schedule   ");
 }
-void printMainMenu2(){
+void printMainMenu2(){ //MenuMode =1 & MenuOption=0
+
   
   lcd.setCursor(0,0);
   lcd.print("Settings        ");
@@ -224,24 +248,131 @@ void printSettingSetTime(){
   lcd.setCursor(0,0);
   lcd.print("Set Time        ");
   lcd.setCursor(0,1);
-  lcd.print(getDigit(hr,1));
-  lcd.print(getDigit(hr,0)); //hour
+  //--------------- set hr
+  if(setTimePositionSettings==1){
+    if(blinkMode==true){
+      lcd.print(getDigit(hr,1));
+      lcd.print(getDigit(hr,0)); //hour
+    }else{
+      lcd.print("  ");
+    }
+  }else{
+    lcd.print(getDigit(hr,1));
+    lcd.print(getDigit(hr,0)); //hour
+  }
+  //--------------- end of set hr
   lcd.print("."); 
-  lcd.print(getDigit(min,1));
-  lcd.print(getDigit(min,0)); //minute
+
+  //--------------- set min
+  if(setTimePositionSettings==2){
+    if(blinkMode==true){
+      lcd.print(getDigit(min,1));
+      lcd.print(getDigit(min,0)); //minute
+    }else{
+      lcd.print("  ");
+    }
+  }else{
+    lcd.print(getDigit(min,1));
+    lcd.print(getDigit(min,0)); //minute
+  }
+//--------------- set min
+  
   lcd.print(".");
-  lcd.print(getDigit(sec,1));
-  lcd.print(getDigit(sec,0)); //second
-  lcd.print(meridiemName[meridiemNumberSetTime]); //AM / PM
+
+  //--------------- set sec
+  if(setTimePositionSettings==3){
+    if(blinkMode==true){
+      lcd.print(getDigit(sec,1));
+      lcd.print(getDigit(sec,0)); //second
+    }else{
+      lcd.print("  ");
+    }
+  }else{
+    lcd.print(getDigit(sec,1));
+    lcd.print(getDigit(sec,0)); //second
+  }
+  //--------------- end of set hr
+
+  //--------------- set meridian
+  if(setTimePositionSettings==4){
+    if(blinkMode==true){
+      lcd.print(meridiemName[meridiemNumberSetTime]); //AM / PM
+      lcd.print("      ");
+    }else{
+      lcd.print("  ");
+    }
+  }else{
+    lcd.print(meridiemName[meridiemNumberSetTime]); //AM / PM
+    lcd.print("      ");
+  }
+  //--------------- set meridian
+  
+}
+
+void printSettingSetDate(){
+  //hr = 0, min = 0, sec = 0, day = 0, month = 0, year=0, meridiemNumberSetTime;
+
+  //setDatePositionSettings
+  lcd.setCursor(0,0);
+  lcd.print("Set Date        ");
+  lcd.setCursor(0,1);
+  
+  //--------------- set day
+  if(setDatePositionSettings==1){
+    if(blinkMode==true){
+      lcd.print(getDigit(day,1));
+      lcd.print(getDigit(day,0)); //day
+    }else{
+      lcd.print("  ");
+    }
+  }else{
+    lcd.print(getDigit(day,1));
+    lcd.print(getDigit(day,0)); //day
+  }
+  
+  
+  lcd.print("/"); 
+
+  //--------------- set month
+  if(setDatePositionSettings==2){
+    if(blinkMode==true){
+      lcd.print(getDigit(month,1));
+      lcd.print(getDigit(month,0)); //month
+    }else{
+      lcd.print("  ");
+    }
+  }else{
+    lcd.print(getDigit(month,1));
+    lcd.print(getDigit(month,0)); //month
+  }
+  
+  
+  lcd.print("/20");
+
+  //--------------- set month
+  if(setDatePositionSettings==3){
+    if(blinkMode==true){
+      lcd.print(getDigit(year,1));
+      lcd.print(getDigit(year,0)); //year
+    }else{
+      lcd.print("  ");
+    }
+  }else{
+    lcd.print(getDigit(year,1));
+    lcd.print(getDigit(year,0)); //year 
+  }
+  
+  
   lcd.print("      ");
 }
+
 void printSettingMinimumTempurature(){
   lcd.setCursor(0,0);
   lcd.print("Set Minimum Temp");
   lcd.setCursor(0,1);
   lcd.print(getDigit(minimumTemp,1));
   lcd.print(getDigit(minimumTemp,0));
-  lcd.print(" celcius");
+  lcd.print(" Celsius");
   lcd.print("      ");
 
 }
@@ -538,6 +669,9 @@ void writeEEPROM(){
   EEPROM.write(eep_minimumTemp,minimumTemp);
   EEPROM.write(eep_heaterOffTemp,heaterOffTemp);
 
+  //weigh sensorSettins 
+  EEPROM.write(eep_calibratingFactor,calibratingFactor);
+
   //Filter
   for (int i = 0; i<5; i++) {
     EEPROM.write(eep_filterSlotsStatus[i],filterSlotsStatus[i]);
@@ -638,6 +772,7 @@ void readEEPROM(){
   //loading variables
   manualMode=EEPROM.read(eep_manualMode);
   isSaved=EEPROM.read(eep_isSaved);
+  calibratingFactor = EEPROM.read(eep_calibratingFactor);
 }
 
 /*-----------------------------------------------Get values from Sensors-------------------------------*/
@@ -651,9 +786,9 @@ void getWeightSensorReadings(){
 void getTempuratureSensorReadings(){
   // call sensors.requestTemperatures() to issue a global temperature 
   // request to all devices on the bus
-  Serial.print("Requesting temperatures...");
+  //Serial.print("Requesting temperatures...");
   sensors.requestTemperatures(); // Send the command to get temperatures
-  Serial.println("DONE");
+  //Serial.println("DONE");
   
   // It responds almost immediately. Let's print out the data
   printTemperature(insideThermometer); // Use a simple function to print out the data
@@ -668,13 +803,23 @@ void printTemperature(DeviceAddress deviceAddress){
   float tempC = sensors.getTempC(deviceAddress);
   if(tempC == DEVICE_DISCONNECTED_C) 
   {
-    Serial.println("Error: Could not read temperature data");
+    //Serial.println("Error: Could not read temperature data");
     return;
+  }else{
+    //It means there are sensor reading
+    if (tempC!=84){
+      heatValueC = tempC;
+      Serial.print("Temp C: ");
+      Serial.print(heatValueC);
+    }
+
   }
-  Serial.print("Temp C: ");
-  Serial.print(tempC);
-  Serial.print(" Temp F: ");
-  Serial.println(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
+  
+
+
+
+  
+  
 }
 
 // function to print a device address
@@ -714,4 +859,461 @@ void tempuratureSensorSetup(){
   Serial.print("Device 0 Resolution: ");
   Serial.print(sensors.getResolution(insideThermometer), DEC); 
   Serial.println();
+}
+
+
+void clearAllScreenVariables(){
+  menuMode=0;
+  menuSelectionOption=0;
+  menuLevel1=0;
+  menuLevel2=0;
+  setTimePositionSettings=0;
+  setTimePositionFeeder=0;
+}
+
+
+void debugVariables(){
+  Serial.print("isSaved= ");
+  Serial.print(isSaved);
+  Serial.print("  menuMode= ");
+  Serial.print(menuMode);
+  Serial.print("  menuSelectionOption= ");
+  Serial.print(menuSelectionOption);
+  Serial.print("  menuLevel1= ");
+  Serial.print(menuLevel1);
+  Serial.print("  menuLevel2= ");
+  Serial.print(menuLevel2);
+  Serial.print("  setTimePositionSettings= ");
+  Serial.print(setTimePositionSettings);
+  Serial.print("  setTimePositionFeeder= ");
+  Serial.print(setTimePositionFeeder);
+  Serial.println();
+}
+
+void changeScreens(){
+
+
+  debugVariables();
+  
+
+  //Desktop
+  if(isSaved==1 && menuMode==0 && menuSelectionOption==0 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    lcd.setCursor(0,0);
+    lcd.print("Desktop         ");
+    lcd.setCursor(0,1);
+    lcd.print("                ");
+  }
+
+  //------------------------------------------Settings List-------------------------------------------------//
+ 
+  //Settings menu 1 list
+  if(menuMode==1 && menuSelectionOption==1 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    printMainMenu1();
+  }
+
+
+  //settings menu 2 list
+  if(menuMode==1 && menuSelectionOption==2 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    printMainMenu2();
+  }  
+
+
+  //settings menu 3 list
+  if(menuMode==1 && menuSelectionOption==3 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    printMainMenu3();
+  } 
+
+  //------------------------------------------Settings Sub list//
+
+  //-------------Food Per Serving
+  if(menuMode==1 && menuSelectionOption==1 && menuLevel1==1 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    printSettingsFoodServing();
+  }
+
+  
+
+  //-------------Set time settings
+  //set time hr
+  if(menuMode==1 && menuSelectionOption==1 && menuLevel1==2 && menuLevel2==0 && setTimePositionSettings==1 && setTimePositionFeeder==0){
+    printSettingSetTime();
+  }  
+
+  //set time min
+  if(menuMode==1 && menuSelectionOption==1 && menuLevel1==2 && menuLevel2==0 && setTimePositionSettings==2 && setTimePositionFeeder==0){
+    printSettingSetTime();
+  } 
+
+  //set time sec
+  if(menuMode==1 && menuSelectionOption==1 && menuLevel1==2 && menuLevel2==0 && setTimePositionSettings==3 && setTimePositionFeeder==0){
+    printSettingSetTime();
+  } 
+
+  //set time meridiem
+  if(menuMode==1 && menuSelectionOption==1 && menuLevel1==2 && menuLevel2==0 && setTimePositionSettings==4 && setTimePositionFeeder==0){
+    printSettingSetTime();
+  }
+
+  
+  //-------------Set date settings
+  //set date day
+  if(menuMode==1 && menuSelectionOption==1 && menuLevel1==3 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0 &&  setDatePositionSettings == 1){
+    printSettingSetDate();
+  }
+
+  //set date month
+  if(menuMode==1 && menuSelectionOption==1 && menuLevel1==3 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0 &&  setDatePositionSettings == 2){
+    printSettingSetDate();
+  }
+
+  //set date year
+  if(menuMode==1 && menuSelectionOption==1 && menuLevel1==3 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0 &&  setDatePositionSettings == 3){
+    printSettingSetDate();
+  }
+
+  //-------------Set minimum Temp
+  if(menuMode==1 && menuSelectionOption==1 && menuLevel1==4 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    printSettingMinimumTempurature();
+  }
+  
+//-------------Set Heater off Temp
+  if(menuMode==1 && menuSelectionOption==1 && menuLevel1==5 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    printSettingHeaterOffTempurature();
+  }
+
+
+
+}
+
+
+
+
+
+
+
+
+void buttonActivity(){
+  bool btnOkValue = digitalRead(btOk);
+  bool btnModeValue = digitalRead(btMode);
+  bool btnUpValue = digitalRead(btUp);
+  bool btnDownValue = digitalRead(btDown);
+
+  //Desktop
+  if(isSaved==1 && menuMode==0 && menuSelectionOption==0 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+   
+
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      //do nothin
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      //do nothing
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      //do mothing
+     
+      menuMode=1;
+      menuSelectionOption=1;
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      delay(500);
+    }
+  }
+
+  /*------------------------------------------Settings List-------------------------------------------------*/
+ 
+  //Settings menu 1 list
+  else if(menuMode==1 && menuSelectionOption==1 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+ 
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      menuSelectionOption=4;
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      menuSelectionOption=2;
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      //clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      menuLevel1 = 1; 
+      delay(500);
+    }
+  }
+
+
+  //settings menu 2 list
+  else if(menuMode==1 && menuSelectionOption==2 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+ 
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      menuSelectionOption=1;
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      menuSelectionOption=3;
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      menuLevel1 = 2; 
+      delay(500);
+    }
+  }  
+
+  
+  //settings menu 3 list
+  else if(menuMode==1 && menuSelectionOption==3 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      menuSelectionOption=2;
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      menuSelectionOption=1;
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      menuLevel1 = 3; 
+      delay(500);
+    }
+  } 
+
+  //------------------------------------------Settings Sub list//
+
+  //-------------Food Per Serving
+  else if(menuMode==1 && menuSelectionOption==1 && menuLevel1==1 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      intFoodPerServe++;
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      intFoodPerServe--;
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      delay(500);
+      menuLevel1=2; 
+      setTimePositionSettings=1;
+    }
+  }
+
+  
+
+  //-------------Set time settings
+  //set time hr
+  else if(menuMode==1 && menuSelectionOption==1 && menuLevel1==2 && menuLevel2==0 && setTimePositionSettings==1 && setTimePositionFeeder==0){
+    
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      hr++;
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      hr--;
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      setTimePositionSettings=2;
+      delay(500);
+    }
+  }  
+
+  //set time min
+  else if(menuMode==1 && menuSelectionOption==1 && menuLevel1==2 && menuLevel2==0 && setTimePositionSettings==2 && setTimePositionFeeder==0){
+    
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      min++;
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      min--;
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      setTimePositionSettings=3;
+      delay(500);
+    }
+  } 
+
+  //set time sec
+  else if(menuMode==1 && menuSelectionOption==1 && menuLevel1==2 && menuLevel2==0 && setTimePositionSettings==3 && setTimePositionFeeder==0){
+   
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      sec++;
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      sec--;
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      setTimePositionSettings=4;
+      delay(500);
+    }
+    
+  } 
+
+  //set time meridiem
+  else if(menuMode==1 && menuSelectionOption==1 && menuLevel1==2 && menuLevel2==0 && setTimePositionSettings==4 && setTimePositionFeeder==0){
+    
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      meridiemNumberSetTime ++;
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      meridiemNumberSetTime --;
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      setTimePositionSettings=0;
+      setDatePositionSettings = 1;
+      menuLevel1 = 3;
+      delay(500);
+    }
+  }
+
+  
+  //-------------Set date settings
+  //set date day
+  else if(menuMode==1 && menuSelectionOption==1 && menuLevel1==3 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0 &&  setDatePositionSettings == 1){
+    
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      day++;
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      day--;
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      setDatePositionSettings++;
+      delay(500);
+    }
+  }
+
+  //set date month
+  else if(menuMode==1 && menuSelectionOption==1 && menuLevel1==3 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0 &&  setDatePositionSettings == 2){
+    
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      month++;
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      month--;
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      setDatePositionSettings++;
+      delay(500);
+    }
+  }
+
+  //set date year
+  else if(menuMode==1 && menuSelectionOption==1 && menuLevel1==3 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0 &&  setDatePositionSettings == 3){
+
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      year++;
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      year--;
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      setDatePositionSettings=0;
+      menuLevel1 = 4;
+      delay(500);
+    }
+  }
+//-------------Set minimum Temp
+  else if(menuMode==1 && menuSelectionOption==1 && menuLevel1==4 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      minimumTemp++;
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      minimumTemp--;
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      menuLevel1=5;
+      //Save all details
+      delay(500);
+    }
+  }
+
+
+
+
+//-------------Set Heater off Temp
+  else if(menuMode==1 && menuSelectionOption==1 && menuLevel1==5 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      heaterOffTemp++;
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      heaterOffTemp--;
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      menuLevel1=0;
+      //Save all details
+      
+      delay(500);
+    }
+  }
+}
+
+
+
+/*-------------------- Altrenative method for delaying (Millis)-----------------*/
+bool delayMillis(int previousMillis , int interval){
+  
+  unsigned long currentMillis = millis();
+  
+  if(currentMillis - previousMillis >= interval ){
+    return true;
+  }else{
+    return false;
+  }
+  
+}
+
+
+
+//method to toggle blinkMode variable value
+void toggleBlinkModeValue(){
+  if(delayMillis(previousTimeBlink,blinkInterval)){
+
+    if(blinkMode==true){
+      blinkMode=false;
+    }else{
+      blinkMode=true;
+    }
+    previousTimeBlink = millis();
+  } 
 }
