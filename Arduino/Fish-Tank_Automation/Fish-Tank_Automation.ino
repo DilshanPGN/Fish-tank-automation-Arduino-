@@ -528,7 +528,7 @@ void setValueFilterSlot(int slotNumber){
 
   
 
-//--------------- set to HR
+  //--------------- set to HR
   if(setTimePositionFilter==6){
     if(blinkMode==true){
       if(filterSlotsMeridiemTo[slotNumber-1]==0){ //AM
@@ -661,26 +661,86 @@ void printSetValueFeedSlot(int slotNumber){
   */
   lcd.setCursor(0,0);
   lcd.print("Slot| ");
-  lcd.print(getDigit(feedSlotHour[slotNumber-1],1));
-  lcd.print(getDigit(feedSlotHour[slotNumber-1],0));
-  lcd.print(":");
-  lcd.print(getDigit(feedSlotMin[slotNumber-1],1));
-  lcd.print(getDigit(feedSlotMin[slotNumber-1],0));
-  if(feedSlotsMeridiem[slotNumber-1]==0){ //AM
-  lcd.print("AM     ");
+
+  //--------------- hour feed
+  if(setTimePositionFeeder==1){
+    if(blinkMode==true){
+      lcd.print(getDigit(feedSlotHour[slotNumber-1],1));
+      lcd.print(getDigit(feedSlotHour[slotNumber-1],0));
+    }else{
+      lcd.print("  ");
+    }
   }else{
-  lcd.print("PM     ");
+    lcd.print(getDigit(feedSlotHour[slotNumber-1],1));
+    lcd.print(getDigit(feedSlotHour[slotNumber-1],0));
   }
+
+
+  lcd.print(":");
+
+  //--------------- minute feed
+  if(setTimePositionFeeder==2){
+    if(blinkMode==true){
+      lcd.print(getDigit(feedSlotMin[slotNumber-1],1));
+      lcd.print(getDigit(feedSlotMin[slotNumber-1],0));
+    }else{
+      lcd.print("  ");
+    }
+  }else{
+    lcd.print(getDigit(feedSlotMin[slotNumber-1],1));
+    lcd.print(getDigit(feedSlotMin[slotNumber-1],0));
+  }
+
+  
+
+//--------------- mreridean feed
+  if(setTimePositionFeeder==3){
+    if(blinkMode==true){
+      if(feedSlotsMeridiem[slotNumber-1]==0){ //AM
+        lcd.print("AM");
+      }else{
+        lcd.print("PM");
+      }
+    }else{
+      lcd.print("  ");
+    }
+  }else{
+    if(feedSlotsMeridiem[slotNumber-1]==0){ //AM
+        lcd.print("AM");
+    }else{
+      lcd.print("PM");
+    }
+  }
+
+  lcd.print("     ");
+
   lcd.setCursor(0,1);
   lcd.print("#");
   lcd.print(slotNumber);
   lcd.print("  | ");
- 
-  if(feedSlotsStatus[slotNumber-1]==0){ //AM
-  lcd.print("OFF    ");
+
+  //--------------- state feed
+  if(setTimePositionFeeder==4){
+    if(blinkMode==true){
+      if(feedSlotsStatus[slotNumber-1]==0){ //AM
+        lcd.print("OFF    ");
+      }else{
+        lcd.print("ACTIVE ");
+      }
+    }else{
+      lcd.print("       ");
+    }
   }else{
-  lcd.print("ACTIVE ");
+    if(feedSlotsStatus[slotNumber-1]==0){ //AM
+      lcd.print("OFF    ");
+    }else{
+      lcd.print("ACTIVE ");
+    }
   }
+
+
+ 
+  
 }
 /***********************************Saving************************************/
 void printSaving(){
@@ -1071,7 +1131,7 @@ void changeScreens(){
   }
 
   
-  //------------------------------------------Feed Schedule Sub list//
+  //------------------------------------------Filter Schedule Sub list//
 
   //------------Filter Slot Selection
 
@@ -1107,6 +1167,37 @@ void changeScreens(){
     toggleStateFilterSlot(menuLevel2);
   }
   
+
+  //------------------------------------------Feed Schedule Sub list//
+  //------------Feed Slot Selection
+  //Slot 1
+  if(menuMode==1 && menuSelectionOption==3 && menuLevel1==1 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    printFeedSlot1Menu();
+  }
+  //Slot 2
+  if(menuMode==1 && menuSelectionOption==3 && menuLevel1==2 && menuLevel2==0 ){
+    printFeedSlot2Menu();
+  }
+  //Slot 3
+  if(menuMode==1 && menuSelectionOption==3 && menuLevel1==3 && menuLevel2==0 ){
+    printFeedSlot3Menu();
+  }
+  //Slot 4
+  if(menuMode==1 && menuSelectionOption==3 && menuLevel1==4 && menuLevel2==0 ){
+    printFeedSlot4Menu();
+  }
+  //Slot 5
+  if(menuMode==1 && menuSelectionOption==3 && menuLevel1==5 && menuLevel2==0 ){
+    printFeedSlot5Menu();
+  }
+
+  //------------Feeder Slot Set time
+
+  if(menuMode==1 && menuSelectionOption==3 && menuLevel1!=0 && menuLevel2==1 && menuLevel3 ==0 && setTimePositionFeeder!=0){
+    printSetValueFeedSlot(menuLevel1);
+  }
+
+
 
 }
 
@@ -1196,7 +1287,7 @@ void buttonActivity(){
       clearAllScreenVariables();
     }
     if(btnOkValue==LOW){  //Press Ok buton
-      menuLevel1 = 3; 
+      menuLevel1 = 1; 
       delay(500);
     }
   } 
@@ -1405,7 +1496,7 @@ void buttonActivity(){
   }
 
 
-  //------------------------------------------Feed Schedule Sub list//
+  //------------------------------------------Filter Schedule Sub list//
 
   //------------Filter Slot Selection
 
@@ -1645,6 +1736,197 @@ void buttonActivity(){
       menuLevel1 = 0;
       menuLevel2 = 0;
       menuLevel3 = 0;
+      delay(500);
+    }
+  }
+
+
+
+
+  //------------------------------------------Feed Schedule Sub list//
+
+  //------------Filter Slot Selection
+
+  //Slot 1
+  else if(menuMode==1 && menuSelectionOption==3 && menuLevel1==1 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      menuLevel1=5;
+      delay(500);
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      menuLevel1=2;
+      delay(500);
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      menuLevel2=1;
+      setTimePositionFeeder=1;
+      delay(500);
+    }
+  }
+
+  //Slot 2
+  else if(menuMode==1 && menuSelectionOption==3 && menuLevel1==2 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      menuLevel1=1;
+      delay(500);
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      menuLevel1=3;
+      delay(500);
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      menuLevel2=1;
+      setTimePositionFeeder=1;
+      delay(500);
+    }
+  }
+
+  //Slot 3
+  else if(menuMode==1 && menuSelectionOption==3 && menuLevel1==3 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      menuLevel1=2;
+      delay(500);
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      menuLevel1=4;
+      delay(500);
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      menuLevel2=1;
+      setTimePositionFeeder=1;
+      delay(500);
+    }
+  }
+
+  //Slot 4
+  else if(menuMode==1 && menuSelectionOption==3 && menuLevel1==4 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      menuLevel1=3;
+      delay(500);
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      menuLevel1=5;
+      delay(500);
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      menuLevel2=1;
+      setTimePositionFeeder=1;
+      delay(500);
+    }
+  }
+
+  //Slot 5
+  else if(menuMode==1 && menuSelectionOption==3 && menuLevel1==5 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      menuLevel1=4;
+      delay(500);
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      menuLevel1=1;
+      delay(500);
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      menuLevel2=1;
+      setTimePositionFeeder=1;
+      delay(500);
+    }
+  }
+
+  //------------Feeder Slot Set time
+  
+  //From hh 
+  else if(menuMode==1 && menuSelectionOption==3 && menuLevel1!=0 && menuLevel2==1 && setTimePositionFeeder==1){
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      feedSlotHour[menuLevel1-1]= feedSlotHour[menuLevel1-1]+1;      
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      feedSlotHour[menuLevel1-1]= feedSlotHour[menuLevel1-1]-1;     
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      setTimePositionFeeder =2;
+      delay(500);
+    }
+  }
+  
+  //From min
+  else if(menuMode==1 && menuSelectionOption==3 && menuLevel1!=0 && menuLevel2==1 && setTimePositionFeeder==2){
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      feedSlotMin[menuLevel1-1] = feedSlotMin[menuLevel1-1]+1;      
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      feedSlotMin[menuLevel1-1] = feedSlotMin[menuLevel1-1]-1;     
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      setTimePositionFeeder =3;
+      delay(500);
+    }
+  }
+
+
+  //From Meridiem
+  else if(menuMode==1 && menuSelectionOption==3 && menuLevel1!=0 && menuLevel2==1 && setTimePositionFeeder==3){
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      feedSlotsMeridiem[menuLevel1-1] = feedSlotsMeridiem[menuLevel1-1]+1;      
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      feedSlotsMeridiem[menuLevel1-1] = feedSlotsMeridiem[menuLevel1-1]-1;     
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+      setTimePositionFeeder =4;
+      delay(500);
+    }
+  }
+
+  //feeder status
+  else if(menuMode==1 && menuSelectionOption==3 && menuLevel1!=0 && menuLevel2==1 && setTimePositionFeeder==4){
+    //Key change
+    if(btnUpValue==LOW){ //Press Up button
+      feedSlotsStatus[menuLevel1-1] = feedSlotsStatus[menuLevel1-1]+1;      
+    }
+    if(btnDownValue==LOW){ //Press Down button
+      feedSlotsStatus[menuLevel1-1] = feedSlotsStatus[menuLevel1-1]-1;     
+    }
+    if(btnModeValue==LOW){ //Press Mode button
+      clearAllScreenVariables();
+    }
+    if(btnOkValue==LOW){  //Press Ok buton
+    
+      setTimePositionFeeder =0;
+      menuLevel1=0;
+      menuLevel2=0;
+      writeEEPROM(); //save
       delay(500);
     }
   }
