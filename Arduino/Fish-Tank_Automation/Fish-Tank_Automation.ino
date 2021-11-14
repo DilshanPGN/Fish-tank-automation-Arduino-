@@ -21,8 +21,19 @@ LiquidCrystal_I2C lcd(0x20,16,2);
 //Buzzer
 #define buzzer 13
 
+//Motor
+#define motorPin 10
+
 //Tempurature sensor
 #define ONE_WIRE_BUS 6  //pin 6 of arduino
+
+//variable to save motor is On or OFF
+bool isMotorOn = false;
+int prevoiusQty=0; //this variable used in triggerFeederFunction
+bool isMinutePassed = true; //this need in triggerFeederFunction
+unsigned long previousTimeFeeder = 0;  //this value use for pass one minute
+int blinkIntervalFeeder=60005;
+
 
 //RTC module
 char daysOfTheWeek[7][12] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
@@ -37,7 +48,7 @@ int rtcYear = 0;
 
 //Value for blinking
 
-bool blinkMode = true;
+bool blinkMode = false;
 unsigned long previousTimeBlink = 0;  //this value use for blinking
 int blinkInterval=200;
 
@@ -80,9 +91,9 @@ uint8_t eep_intFoodPerServeFisrtTwoNumbers = 1;
 uint8_t eep_intFoodPerServeLastTwoNumbers = 2;
 
 //set clockVariables
-uint8_t eep_hr = 3, eep_min = 4, eep_sec = 5, eep_day = 6, eep_month = 7, eep_year=8 ,  eep_meridiemNumberSetTime=9;
+//uint8_t eep_hr = 3, eep_min = 4, eep_sec = 5, eep_day = 6, eep_month = 7, eep_year=8 ,  eep_meridiemNumberSetTime=9;
 
-//heat sensor settins
+//heat                    sensor settins
 uint8_t eep_minimumTemp=10 ,eep_heaterOffTemp=11;
 
 //Filter
@@ -108,8 +119,10 @@ uint8_t eep_calibratingFactor = 69;
 
 
 //----------------------- Variable for saving value from EEPROM --------------------------
-int intFoodPerServe=1234;
+int intFoodPerServe=100;
 int calibratingFactor;
+
+
 
 //set clock
 int hr = 1, min = 30, sec = 55, day = 8, month = 11, year=21 ,  meridiemNumberSetTime=1;  // hour , minute , second ,date , month ,year
@@ -131,9 +144,9 @@ int filterSlotsMeridiemTo[5] = {1,1,1,1,1};//0=AM , 1=PM
 
 //Feed slots active = 1 , deactive = 0
 int feedSlotsStatus[5] = {0,1,0,0,0};
-int feedSlotHour[5]={01,01,01,01,01};
-int feedSlotMin[5]={30,30,30,30,30};
-int feedSlotsMeridiem[5] = {0,0,0,0,0};  //0=AM , 1=PM
+int feedSlotHour[5]={10,01,01,01,01};
+int feedSlotMin[5]={33,30,30,30,30};
+int feedSlotsMeridiem[5] = {1,0,0,0,0};  //0=AM , 1=PM
 
 //Feed AutoCalculation
 int feedTimesPerDay = 0;
@@ -150,6 +163,7 @@ int isSaved = 1;
 int foodWeight; //inGrams
 float heatValueC; //inCelcius
 
+int remainings = 0; //how many number of times food can be served
 
 
 void setup()
@@ -163,9 +177,13 @@ void setup()
   pinMode(btUp,INPUT_PULLUP);
   pinMode(btDown,INPUT_PULLUP); 
   pinMode(btMode,INPUT_PULLUP);
+
+  pinMode(motorPin,OUTPUT);
+  
   
   //Weight sensor (Temporary)
   pinMode(weightPin,INPUT);
+  
 
   //External inturrupts
   //attachInterrupt(digitalPinToInterrupt(btUp),buttonActivity,LOW);
@@ -185,10 +203,16 @@ void setup()
 }
 void loop()
 {
+  
+  getWeightSensorReadings();
+  //getTempuratureSensorReadings();
   updateRTCVariables();
   buttonActivity();
   changeScreens();
   toggleBlinkModeValue();  
+
+
+  triggerFeeder();
 }
 
 /*-------------------------------------------Button Functions---------------------------------------*/
@@ -212,6 +236,46 @@ void pressDown(){
 
 /*------------------------------------------------Screens------------------------------------------*/
 /******************Initialization*************************/
+void printHomeScreen(){
+  
+  lcd.setCursor(0,0);
+  //time
+  lcd.print(getDigit(rtcHr,1));
+  lcd.print(getDigit(rtcHr,0));
+  lcd.print(":");
+  lcd.print(getDigit(rtcMin,1));
+  lcd.print(getDigit(rtcMin,0));
+  lcd.print(":");
+  lcd.print(getDigit(rtcSec,1));
+  lcd.print(getDigit(rtcSec,0));
+  lcd.print(" "); //9
+
+  //size
+  double weightInKillo = foodWeight/1000.0;
+  
+  //Serial.print("Weight =");
+  //Serial.print(weightInKillo);
+  //Serial.println();
+  lcd.print(getDigit(weightInKillo,0));
+  lcd.print(".");
+  lcd.print(getDigit(weightInKillo,-1));
+  lcd.print(getDigit(weightInKillo,-2));
+  lcd.print(getDigit(weightInKillo,-3));
+  lcd.print("KG");
+
+  lcd.setCursor(0,1);
+  lcd.print(getDigit(heatValueC,1));
+  lcd.print(getDigit(heatValueC,0));
+  lcd.print("Celcius");
+  lcd.print(" ");
+  lcd.print(getDigit(remainings,2));
+  lcd.print(getDigit(remainings,1));
+  lcd.print(getDigit(remainings,0));
+  lcd.print("Qty");
+  
+}
+
+/***************************Home Screen*******************************/
 void printCalibrateScale(){
   lcd.setCursor(0,0);
   lcd.print("Calibrate Scale:");
@@ -219,13 +283,14 @@ void printCalibrateScale(){
   lcd.print("Set 0g->press OK");
 }
 
+
 /**************************Main Menu**********************************/
 void printMainMenu1(){
   
   lcd.setCursor(0,0);
   lcd.print("Settings       >");
   lcd.setCursor(0,1);
-  lcd.print("Feed Schedule   ");
+  lcd.print("Filter Schedule ");
 }
 void printMainMenu2(){ //MenuMode =1 & MenuOption=0
 
@@ -233,12 +298,12 @@ void printMainMenu2(){ //MenuMode =1 & MenuOption=0
   lcd.setCursor(0,0);
   lcd.print("Settings        ");
   lcd.setCursor(0,1);
-  lcd.print("Feed Schedule  >");
+  lcd.print("Filter Schedule>");
 }
 void printMainMenu3(){
   
   lcd.setCursor(0,0);  
-  lcd.print("Filter Schedule>");
+  lcd.print("Feed Schedule > ");
   lcd.setCursor(0,1);  
   lcd.print("                ");
 
@@ -820,13 +885,13 @@ void writeEEPROM(){
   EEPROM.write(eep_intFoodPerServeFisrtTwoNumbers,intFoodPerServe%100);
   EEPROM.write(eep_intFoodPerServeLastTwoNumbers,intFoodPerServe%100);
   //set clockVariables
-  EEPROM.write(eep_hr,hr);
-  EEPROM.write(eep_min,min);
-  EEPROM.write(eep_sec,sec);
-  EEPROM.write(eep_day,day);
-  EEPROM.write(eep_month,month);
-  EEPROM.write(eep_year,year);
-  EEPROM.write(eep_meridiemNumberSetTime,meridiemNumberSetTime);
+  //EEPROM.write(eep_hr,hr);
+  //EEPROM.write(eep_min,min);
+  //EEPROM.write(eep_sec,sec);
+  //EEPROM.write(eep_day,day);
+  //EEPROM.write(eep_month,month);
+  //EEPROM.write(eep_year,year);
+  //EEPROM.write(eep_meridiemNumberSetTime,meridiemNumberSetTime);
   //heat sensor settins
   EEPROM.write(eep_minimumTemp,minimumTemp);
   EEPROM.write(eep_heaterOffTemp,heaterOffTemp);
@@ -883,13 +948,13 @@ void readEEPROM(){
   
   
   //set clockVariables
-  hr = EEPROM.read(eep_hr);
-  min = EEPROM.read(eep_min);
-  sec = EEPROM.read(eep_sec);
-  day = EEPROM.read(eep_day);
-  month = EEPROM.read(eep_month);
-  year = EEPROM.read(eep_year);
-  meridiemNumberSetTime = EEPROM.read(eep_meridiemNumberSetTime);
+  //hr = EEPROM.read(eep_hr);
+  //min = EEPROM.read(eep_min);
+  //sec = EEPROM.read(eep_sec);
+  //day = EEPROM.read(eep_day);
+  //month = EEPROM.read(eep_month);
+  //year = EEPROM.read(eep_year);
+  //meridiemNumberSetTime = EEPROM.read(eep_meridiemNumberSetTime);
   //heat sensor settins
   minimumTemp = EEPROM.read(eep_minimumTemp);
   heaterOffTemp = EEPROM.read(eep_heaterOffTemp);
@@ -941,9 +1006,11 @@ void readEEPROM(){
 void getWeightSensorReadings(){
   int val = analogRead(weightPin);
   foodWeight = map(val, 0, 1023, minWeight, maxWeight);
-  
-  Serial.println(foodWeight);
+  remainings = foodWeight / intFoodPerServe;
+  //Serial.println(foodWeight);
 }
+
+
 
 void getTempuratureSensorReadings(){
   // call sensors.requestTemperatures() to issue a global temperature 
@@ -971,8 +1038,8 @@ void printTemperature(DeviceAddress deviceAddress){
     //It means there are sensor reading
     if (tempC!=84){
       heatValueC = tempC;
-      Serial.print("Temp C: ");
-      Serial.print(heatValueC);
+      //Serial.print("Temp C: ");
+      //Serial.print(heatValueC);
     }
 
   }
@@ -1036,6 +1103,9 @@ void clearAllScreenVariables(){
 
 
 void debugVariables(){
+  //Serial.println(foodWeight);
+  
+  /*
   Serial.print("isSaved= ");
   Serial.print(isSaved);
   Serial.print("  menuMode= ");
@@ -1051,6 +1121,7 @@ void debugVariables(){
   //Serial.print("  setTimePositionFeeder= ");
   //Serial.print(setTimePositionFeeder);
   Serial.println();
+  /*/
 }
 
 void changeScreens(){
@@ -1061,10 +1132,9 @@ void changeScreens(){
 
   //Desktop
   if(isSaved==1 && menuMode==0 && menuSelectionOption==0 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
-    lcd.setCursor(0,0);
-    lcd.print("Desktop         ");
-    lcd.setCursor(0,1);
-    lcd.print("                ");
+    printHomeScreen();
+
+    
   }
 
   //------------------------------------------Settings List-------------------------------------------------//
@@ -1235,7 +1305,7 @@ void buttonActivity(){
     }
     if(btnModeValue==LOW){ //Press Mode button
       //do mothing
-     
+      delay(500);
       menuMode=1;
       menuSelectionOption=1;
     }
@@ -1257,6 +1327,7 @@ void buttonActivity(){
       menuSelectionOption=2;
     }
     if(btnModeValue==LOW){ //Press Mode button
+      delay(500);
       clearAllScreenVariables();
     }
     if(btnOkValue==LOW){  //Press Ok buton
@@ -1277,6 +1348,7 @@ void buttonActivity(){
       menuSelectionOption=3;
     }
     if(btnModeValue==LOW){ //Press Mode button
+      delay(500);
       clearAllScreenVariables();
     }
     if(btnOkValue==LOW){  //Press Ok buton
@@ -1297,6 +1369,7 @@ void buttonActivity(){
       menuSelectionOption=1;
     }
     if(btnModeValue==LOW){ //Press Mode button
+       delay(500);
       clearAllScreenVariables();
     }
     if(btnOkValue==LOW){  //Press Ok buton
@@ -1324,6 +1397,8 @@ void buttonActivity(){
       delay(500);
       menuLevel1=2; 
       setTimePositionSettings=1;
+      updateSetClockVariables();
+
     }
   }
  
@@ -1464,6 +1539,7 @@ void buttonActivity(){
     if(btnOkValue==LOW){  //Press Ok buton
       setDatePositionSettings=0;
       menuLevel1 = 4;
+      updateRTC();
       delay(500);
     }
   }
@@ -1503,7 +1579,7 @@ void buttonActivity(){
     if(btnOkValue==LOW){  //Press Ok buton
       menuLevel1=0;
       //Save all details
-      
+      writeEEPROM();
       delay(500);
     }
   }
@@ -2006,9 +2082,125 @@ void updateRTCVariables(){
     rtcMonth = now.month();
     rtcYear = (now.year()-2000);
     
-    Serial.println(rtcYear);
+    //Serial.println(rtcYear);
+}
+
+void updateSetClockVariables(){
+
+  if(rtcHr>12){
+    hr = rtcHr-12;
+  }else{
+    hr = rtcHr; 
+  }
+  
+  min = rtcMin; 
+  sec = rtcSec; 
+  day = rtcDay; 
+  month = rtcMonth; 
+  year= rtcYear; 
+
+  if(rtcHr>12){
+    meridiemNumberSetTime=1;
+  }else{
+    meridiemNumberSetTime=0;
+  } 
+  
 }
 
 void updateRTC(){
-  rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+  int fullYear = 2000+year;
+  int fullHr =0;
+  if(meridiemNumberSetTime==1){
+    fullHr = 12+hr;
+  }else{
+    fullHr = hr;
+  } 
+  rtc.adjust(DateTime(fullYear, month, day, fullHr, min, sec));
 }
+
+
+/*--------------------------------------------------  Triggering methods--------------------------------------*/
+
+/*-------------------Trigger feeder------------*/
+void triggerFeeder(){
+  
+  Serial.print("remainings = ");
+  Serial.print(remainings);
+  Serial.print("      prevoiusQty = ");
+  Serial.print(prevoiusQty);
+  Serial.print("      isMunutePassed = ");
+  Serial.print(isMinutePassed);
+  Serial.print("      prevoiusQty>remainings = ");
+  Serial.print(prevoiusQty>remainings);
+  Serial.print("      isMotorOn = ");
+  Serial.print(isMotorOn);
+  Serial.println();
+  delay(200);
+
+// && digitalRead(motorPin)==LOW
+  if(isFeederTimeArrive() && isMotorOn==false && isMinutePassed==true){
+    
+    previousTimeFeeder = millis();
+    isMinutePassed = false;
+
+    prevoiusQty = remainings;
+    digitalWrite(motorPin,HIGH);
+    isMotorOn=true;
+  }
+
+  if(isMotorOn==true && prevoiusQty>remainings){
+
+    digitalWrite(motorPin,LOW);
+    isMotorOn=false;
+
+  }
+
+  if(delayMillis(previousTimeFeeder , blinkIntervalFeeder)){
+    isMinutePassed = true;
+  }
+
+
+}
+//trigger feeder sub method
+
+bool isFeederTimeArrive(){
+
+  //getting values to compare
+  int hr=0;
+  int min = rtcMin;
+  int meridean = 0;
+
+  bool isFound=false;
+
+  if(rtcHr>12){
+    hr = rtcHr-12;
+  }else{hr = rtcHr;}
+  
+  if(rtcHr>12){
+    meridean=1;
+  }else{meridean=0;}
+
+  for(int i = 0; i<5 ; i++){
+
+    if(feedSlotHour[i]==hr && feedSlotMin[i]==min && feedSlotsMeridiem[i]==meridean){
+      isFound=true;
+      break;
+    }
+  }
+
+  return isFound;
+}
+
+
+
+
+
+
+void triggerHeater(){
+
+}
+
+void rigerFilter(){
+
+}
+
