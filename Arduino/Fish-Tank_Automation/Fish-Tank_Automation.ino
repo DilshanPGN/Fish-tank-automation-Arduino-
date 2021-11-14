@@ -2,9 +2,10 @@
 #include <DallasTemperature.h>
 #include <LiquidCrystal_I2C.h>
 #include <EEPROM.h>
+#include <Wire.h>
+#include <RTClib.h>
 
-
-
+RTC_DS1307 rtc;
 LiquidCrystal_I2C lcd(0x20,16,2); 
 
 //defining buttons
@@ -22,6 +23,17 @@ LiquidCrystal_I2C lcd(0x20,16,2);
 
 //Tempurature sensor
 #define ONE_WIRE_BUS 6  //pin 6 of arduino
+
+//RTC module
+char daysOfTheWeek[7][12] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+int rtcHr = 0;
+int rtcMin = 0;
+int rtcSec = 0;
+
+int rtcDay = 0;
+int rtcMonth = 0;
+int rtcYear = 0;
+
 
 //Value for blinking
 
@@ -145,7 +157,7 @@ void setup()
   Serial.begin(9600);
   lcd.init(); 
   lcd.backlight();
- 
+  rtcUpdateWithComputer(); //initialize RTC module
   
   pinMode(btOk,INPUT_PULLUP);
   pinMode(btUp,INPUT_PULLUP);
@@ -173,9 +185,10 @@ void setup()
 }
 void loop()
 {
- buttonActivity();
- changeScreens();
- toggleBlinkModeValue();  
+  updateRTCVariables();
+  buttonActivity();
+  changeScreens();
+  toggleBlinkModeValue();  
 }
 
 /*-------------------------------------------Button Functions---------------------------------------*/
@@ -1961,4 +1974,41 @@ void toggleBlinkModeValue(){
     }
     previousTimeBlink = millis();
   } 
+}
+
+
+
+//----------------------------------------------------RTC module functions---------------------------------------
+void rtcUpdateWithComputer(){
+  if (! rtc.begin()) 
+  {
+    lcd.print("Couldn't find RTC");
+    while (1);
+  }
+
+  if (! rtc.isrunning()) 
+  {
+    lcd.print("RTC is NOT running!");
+  }
+  
+  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));//auto update from computer time
+    //;// to set the time manualy 
+}
+
+
+void updateRTCVariables(){
+    DateTime now = rtc.now();
+    rtcHr = now.hour();
+    rtcMin = now.minute();
+    rtcSec = now.second();
+
+    rtcDay = now.day();
+    rtcMonth = now.month();
+    rtcYear = (now.year()-2000);
+    
+    Serial.println(rtcYear);
+}
+
+void updateRTC(){
+  rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
 }
