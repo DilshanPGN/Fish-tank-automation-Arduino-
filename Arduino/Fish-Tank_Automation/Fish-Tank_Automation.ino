@@ -140,19 +140,21 @@ int heaterOffTemp=15;
 
 
 //Filter slots active = 1 , deactive = 0
-int filterSlotsStatus[5] = {0,0,0,0,0};
-int filterSlotHourFrom[5]={01,01,01,01,01};
-int filterSlotHourTo[5]={01,01,01,01,01};
-int filterSlotMinFrom[5]={30,30,30,30,30};
-int filterSlotMinTo[5]={30,30,30,30,30};
+
+int filterSlotsStatus[5] = {1,0,0,0,0};
+int filterSlotHourFrom[5]={12,01,01,01,01};
+int filterSlotMinFrom[5]={18,30,30,30,30};
 int filterSlotsMeridiemFrom[5] = {0,0,0,0,0};//0=AM , 1=PM
-int filterSlotsMeridiemTo[5] = {1,1,1,1,1};//0=AM , 1=PM
+
+int filterSlotHourTo[5]={12,01,01,01,01};
+int filterSlotMinTo[5]={19,30,30,30,30};
+int filterSlotsMeridiemTo[5] = {0,1,1,1,1};//0=AM , 1=PM
 
 //Feed slots active = 1 , deactive = 0
 int feedSlotsStatus[5] = {1,1,0,0,0};
-int feedSlotHour[5]={10,01,01,01,01};
-int feedSlotMin[5]={54,30,30,30,30};
-int feedSlotsMeridiem[5] = {1,0,0,0,0};  //0=AM , 1=PM
+int feedSlotHour[5]={12,01,01,01,01};
+int feedSlotMin[5]={36,30,30,30,30};
+int feedSlotsMeridiem[5] = {0,0,0,0,0};  //0=AM , 1=PM
 
 //Feed AutoCalculation
 int feedTimesPerDay = 0;
@@ -183,11 +185,11 @@ void setup()
   pinMode(btUp,INPUT_PULLUP);
   pinMode(btDown,INPUT_PULLUP); 
   pinMode(btMode,INPUT_PULLUP);
-
+  
   pinMode(motorPin,OUTPUT);
   pinMode(relayFilter,OUTPUT);
   pinMode(relayHeater,OUTPUT);
-
+  pinMode(buzzer,OUTPUT);
   
   
   //Weight sensor (Temporary)
@@ -223,6 +225,51 @@ void loop()
 
   triggerFeeder();
   triggerHeater();
+
+  /*
+
+  Serial.print("time = ");
+  Serial.print(filterSlotHourFrom[0]);
+  Serial.print(":");
+  Serial.print(filterSlotMinFrom[0]);
+  
+  if(filterSlotsMeridiemFrom[0]==0){
+    Serial.print("AM");
+  }else if(filterSlotsMeridiemFrom[0]==1){
+    Serial.print("PM");
+  } 
+  Serial.print("  ");
+
+  if(filterSlotsStatus[0]==0){
+    Serial.print("OFF");
+  }else if(filterSlotsStatus[0]==1){
+    Serial.print("ON");
+  } 
+  Serial.print("   ");
+
+Serial.print("rtc = ");
+  
+
+  if(rtcHr>12){
+    Serial.print(rtcHr-12);
+  }else{
+    Serial.print(rtcHr);
+  }
+
+  Serial.print(":");
+  Serial.print(rtcMin);
+  
+  if(rtcHr>12){
+    Serial.print("PM");
+  }else{Serial.print("AM");}
+*/
+
+  //-----------
+
+  //Serial.print("   arrived ? ");
+  //Serial.println(isFilterOffTimeArrive());
+  triggerFilter();
+  triggerBuzzer();
 }
 
 /*-------------------------------------------Button Functions---------------------------------------*/
@@ -2134,18 +2181,18 @@ void updateRTC(){
 /*-------------------Trigger feeder------------*/
 void triggerFeeder(){
   
-  Serial.print("remainings = ");
-  Serial.print(remainings);
-  Serial.print("      prevoiusQty = ");
-  Serial.print(prevoiusQty);
-  Serial.print("      isMunutePassed = ");
-  Serial.print(isMinutePassed);
-  Serial.print("      prevoiusQty>remainings = ");
-  Serial.print(prevoiusQty>remainings);
-  Serial.print("      isMotorOn = ");
-  Serial.print(isMotorOn);
-  Serial.println();
-  delay(200);
+  //Serial.print("remainings = ");
+  //Serial.print(remainings);
+  //Serial.print("      prevoiusQty = ");
+  //Serial.print(prevoiusQty);
+  //Serial.print("      isMunutePassed = ");
+  //Serial.print(isMinutePassed);
+  //Serial.print("      prevoiusQty>remainings = ");
+  //Serial.print(prevoiusQty>remainings);
+  //Serial.print("      isMotorOn = ");
+  //Serial.print(isMotorOn);
+  //Serial.println();
+  //delay(200);
 
 // && digitalRead(motorPin)==LOW
   if(isFeederTimeArrive() && isMotorOn==false && isMinutePassed==true){
@@ -2182,7 +2229,10 @@ bool isFeederTimeArrive(){
 
   bool isFound=false;
 
-  if(rtcHr>12){
+  if(rtcHr==0){
+    hr = 12;
+  }
+  else if(rtcHr>12){
     hr = rtcHr-12;
   }else{hr = rtcHr;}
   
@@ -2224,11 +2274,117 @@ void triggerHeater(){
     isHeaterOn = false;
     digitalWrite(relayHeater,LOW);
   }
+}
+
+/*-------------------Trigger filter------------*/
 
 
+//trigger filter sub methods
+
+void triggerFilter(){
+  changeFilterVariables();
+  if(isFilterOn==true){
+    digitalWrite(relayFilter,HIGH);
+  }else if(isFilterOn==false){
+    digitalWrite(relayFilter,LOW);
+  }
+}
+
+
+void changeFilterVariables(){
+
+  if(isFilterOnTimeArrive() && isFilterOn==false){
+    isFilterOn = true;
+  }
+  
+  if(isFilterOffTimeArrive() && isFilterOn==true){
+    isFilterOn = false;
+  }
+}
+
+bool isFilterOnTimeArrive(){
+
+  //----getting values from rtc to compare
+  int hr=0;
+  int min = rtcMin;
+  int meridean = 0;
+  
+  bool isFound=false;
+
+  if(rtcHr==0){
+    hr = 12;
+  }
+  else if(rtcHr>12){
+    hr = rtcHr-12;
+  }else{hr = rtcHr;}
+  
+  if(rtcHr>12){
+    meridean=1;
+  }else{meridean=0;}
+  //End of getting values from rtc to compare----
+
+
+  for(int i = 0; i<5 ; i++){
+
+    if(filterSlotHourFrom[i]==hr && filterSlotMinFrom[i]==min && filterSlotsMeridiemFrom[i]==meridean && filterSlotsStatus[i]==1){
+      
+      isFound=true;
+      break;
+    }
+  }
+
+  return isFound;
   
 }
 
-void rigerFilter(){
 
+bool isFilterOffTimeArrive(){
+
+  //----getting values from rtc to compare
+  int hr=0;
+  int min = rtcMin;
+  int meridean = 0;
+  
+  bool isFound=false;
+
+  if(rtcHr==0){
+    hr = 12;
+  }
+  else if(rtcHr>12){
+    hr = rtcHr-12;
+  }else{hr = rtcHr;}
+  
+  if(rtcHr>12){
+    meridean=1;
+  }else{meridean=0;}
+  //End of getting values from rtc to compare----
+
+
+  for(int i = 0; i<5 ; i++){
+
+    if(filterSlotHourTo[i]==hr && filterSlotMinTo[i]==min && filterSlotsMeridiemTo[i]==meridean && filterSlotsStatus[i]==1){
+      isFound=true;
+      break;
+    }
+  }
+
+  return isFound;
+}
+
+
+
+
+
+
+
+
+
+
+/*--------------------- Trigger buzzer -----------------------------*/
+void triggerBuzzer(){
+  if(remainings<6 && isMotorOn){
+    digitalWrite(buzzer,HIGH);
+  }else{
+    digitalWrite(buzzer,LOW);
+  }
 }
