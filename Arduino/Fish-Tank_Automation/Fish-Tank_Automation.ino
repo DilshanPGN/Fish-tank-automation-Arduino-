@@ -34,6 +34,12 @@ bool isMinutePassed = true; //this need in triggerFeederFunction
 unsigned long previousTimeFeeder = 0;  //this value use for pass one minute
 int blinkIntervalFeeder=60005;
 
+//variable to save heater is On or OFF
+bool isHeaterOn = false;
+
+//variable to save filer is On or OFF
+bool isFilterOn = false;
+
 
 //RTC module
 char daysOfTheWeek[7][12] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
@@ -143,9 +149,9 @@ int filterSlotsMeridiemFrom[5] = {0,0,0,0,0};//0=AM , 1=PM
 int filterSlotsMeridiemTo[5] = {1,1,1,1,1};//0=AM , 1=PM
 
 //Feed slots active = 1 , deactive = 0
-int feedSlotsStatus[5] = {0,1,0,0,0};
+int feedSlotsStatus[5] = {1,1,0,0,0};
 int feedSlotHour[5]={10,01,01,01,01};
-int feedSlotMin[5]={33,30,30,30,30};
+int feedSlotMin[5]={54,30,30,30,30};
 int feedSlotsMeridiem[5] = {1,0,0,0,0};  //0=AM , 1=PM
 
 //Feed AutoCalculation
@@ -161,7 +167,7 @@ int isSaved = 1;
 //----------------------- Values from sensors --------------------------
 
 int foodWeight; //inGrams
-float heatValueC; //inCelcius
+float heatValueC=2; //inCelcius
 
 int remainings = 0; //how many number of times food can be served
 
@@ -179,6 +185,9 @@ void setup()
   pinMode(btMode,INPUT_PULLUP);
 
   pinMode(motorPin,OUTPUT);
+  pinMode(relayFilter,OUTPUT);
+  pinMode(relayHeater,OUTPUT);
+
   
   
   //Weight sensor (Temporary)
@@ -213,6 +222,7 @@ void loop()
 
 
   triggerFeeder();
+  triggerHeater();
 }
 
 /*-------------------------------------------Button Functions---------------------------------------*/
@@ -2182,7 +2192,7 @@ bool isFeederTimeArrive(){
 
   for(int i = 0; i<5 ; i++){
 
-    if(feedSlotHour[i]==hr && feedSlotMin[i]==min && feedSlotsMeridiem[i]==meridean){
+    if(feedSlotHour[i]==hr && feedSlotMin[i]==min && feedSlotsMeridiem[i]==meridean && feedSlotsStatus[i]==1){
       isFound=true;
       break;
     }
@@ -2192,15 +2202,33 @@ bool isFeederTimeArrive(){
 }
 
 
-
-
-
-
+/*-------------------TriggerHeater------------*/
 void triggerHeater(){
 
+
+  if(heatValueC<=minimumTemp   ){
+    
+    isHeaterOn = true;
+    digitalWrite(relayHeater,HIGH);
+    
+  }else if((heatValueC>minimumTemp  &&  heatValueC<heaterOffTemp  && isHeaterOn==true)){
+    isHeaterOn = true;
+    digitalWrite(relayHeater,HIGH);
+    
+  }
+  else if((heatValueC>minimumTemp  &&  heatValueC<heaterOffTemp  && isHeaterOn==false)){
+    isHeaterOn = false;
+    digitalWrite(relayHeater,LOW);
+  }
+  else if(heatValueC>=heaterOffTemp){
+    isHeaterOn = false;
+    digitalWrite(relayHeater,LOW);
+  }
+
+
+  
 }
 
 void rigerFilter(){
 
 }
-
