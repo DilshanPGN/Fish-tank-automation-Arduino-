@@ -4,15 +4,17 @@
 #include <EEPROM.h>
 #include <Wire.h>
 #include <RTClib.h>
+#include <HX711.h>
+#include <Servo.h>
 
 RTC_DS1307 rtc;
-LiquidCrystal_I2C lcd(0x20,16,2); 
+LiquidCrystal_I2C lcd(0x27,16,2); 
 
 //defining buttons
-#define btOk     5
-#define btMode   4
-#define btUp     3
-#define btDown   2
+#define btOk     3
+#define btMode   2
+#define btUp     4
+#define btDown   5
 
 //defining relay pins
 #define relayFilter 12
@@ -73,6 +75,12 @@ DallasTemperature sensors(&oneWire);
 // arrays to hold device address
 DeviceAddress insideThermometer;
 
+/*---------------------------------------------------------Weight sensor objects---------------------------*/
+HX711 scale(7, 8); // ports DT, CLK    
+
+/*---------------------------------------------------------Servo motor---------------------------*/
+Servo servo;
+
 /*----------------------------------------------------------Variables---------------------------------------------*/
 
 //-----------------------Variables to switch screens---------------------------------------------
@@ -126,7 +134,7 @@ uint8_t eep_calibratingFactor = 69;
 
 //----------------------- Variable for saving value from EEPROM --------------------------
 int intFoodPerServe=100;
-int calibratingFactor;
+double calibratingFactor=-16.70;
 
 
 
@@ -142,18 +150,18 @@ int heaterOffTemp=15;
 //Filter slots active = 1 , deactive = 0
 
 int filterSlotsStatus[5] = {1,0,0,0,0};
-int filterSlotHourFrom[5]={12,01,01,01,01};
-int filterSlotMinFrom[5]={18,30,30,30,30};
+int filterSlotHourFrom[5]={1,01,01,01,01};
+int filterSlotMinFrom[5]={33,30,30,30,30};
 int filterSlotsMeridiemFrom[5] = {0,0,0,0,0};//0=AM , 1=PM
 
-int filterSlotHourTo[5]={12,01,01,01,01};
-int filterSlotMinTo[5]={19,30,30,30,30};
+int filterSlotHourTo[5]={1,01,01,01,01};
+int filterSlotMinTo[5]={34,30,30,30,30};
 int filterSlotsMeridiemTo[5] = {0,1,1,1,1};//0=AM , 1=PM
 
 //Feed slots active = 1 , deactive = 0
 int feedSlotsStatus[5] = {1,1,0,0,0};
-int feedSlotHour[5]={12,01,01,01,01};
-int feedSlotMin[5]={36,30,30,30,30};
+int feedSlotHour[5]={1,01,01,01,01};
+int feedSlotMin[5]={18,30,30,30,30};
 int feedSlotsMeridiem[5] = {0,0,0,0,0};  //0=AM , 1=PM
 
 //Feed AutoCalculation
@@ -168,8 +176,8 @@ int isSaved = 1;
 
 //----------------------- Values from sensors --------------------------
 
-int foodWeight; //inGrams
-float heatValueC=2; //inCelcius
+float foodWeight; //inGrams
+float heatValueC=0; //inCelcius
 
 int remainings = 0; //how many number of times food can be served
 
@@ -190,11 +198,10 @@ void setup()
   pinMode(relayFilter,OUTPUT);
   pinMode(relayHeater,OUTPUT);
   pinMode(buzzer,OUTPUT);
-  
-  
-  //Weight sensor (Temporary)
-  pinMode(weightPin,INPUT);
-  
+
+  //attach servo
+  servo.attach(motorPin);
+  servo.write(3);
 
   //External inturrupts
   //attachInterrupt(digitalPinToInterrupt(btUp),buttonActivity,LOW);
@@ -206,28 +213,29 @@ void setup()
   lcd.print("Welcome");
   lcd.clear();
 
-  //Starting Heat sensor
-  tempuratureSensorSetup();
-
+  //weight sensor setup
+  scale.set_scale();
+  //scale.tare(); // reset the sensor to 0
+  scale.set_scale(calibratingFactor); // apply calibration
   
-  
+  //tempurature sensor setup
+  sensors.begin();
 }
 void loop()
 {
   
-  getWeightSensorReadings();
-  //getTempuratureSensorReadings();
+  
   updateRTCVariables();
   buttonActivity();
   changeScreens();
   toggleBlinkModeValue();  
 
 
-  triggerFeeder();
+  
   triggerHeater();
 
-  /*
-
+  
+/*
   Serial.print("time = ");
   Serial.print(filterSlotHourFrom[0]);
   Serial.print(":");
@@ -264,12 +272,11 @@ Serial.print("rtc = ");
   }else{Serial.print("AM");}
 */
 
-  //-----------
-
-  //Serial.print("   arrived ? ");
-  //Serial.println(isFilterOffTimeArrive());
   triggerFilter();
   triggerBuzzer();
+  
+
+  
 }
 
 /*-------------------------------------------Button Functions---------------------------------------*/
@@ -308,17 +315,18 @@ void printHomeScreen(){
   lcd.print(" "); //9
 
   //size
-  double weightInKillo = foodWeight/1000.0;
+  float weightInKillo = foodWeight/1000.000;
   
   //Serial.print("Weight =");
   //Serial.print(weightInKillo);
   //Serial.println();
-  lcd.print(getDigit(weightInKillo,0));
-  lcd.print(".");
-  lcd.print(getDigit(weightInKillo,-1));
-  lcd.print(getDigit(weightInKillo,-2));
-  lcd.print(getDigit(weightInKillo,-3));
-  lcd.print("KG");
+  lcd.print(getDigit(foodWeight,3));
+  lcd.print(getDigit(foodWeight,2));
+  lcd.print(getDigit(foodWeight,1));
+  lcd.print(getDigit(foodWeight,0));
+  lcd.print(" G");
+  lcd.print(" ");
+  
 
   lcd.setCursor(0,1);
   lcd.print(getDigit(heatValueC,1));
@@ -1061,92 +1069,26 @@ void readEEPROM(){
 
 /*-----------------------------------------------Get values from Sensors-------------------------------*/
 void getWeightSensorReadings(){
-  int val = analogRead(weightPin);
-  foodWeight = map(val, 0, 1023, minWeight, maxWeight);
+  double units; 
+  double initialWeight = 659.39;
+  double containerWeight = 141.75;
+  double error = 0;
+
+  for(int i=0; i<10; i++) units =+ scale.get_units(), 10; // make measurements 10 times
+   units / 10; // divide values by 10
+   foodWeight = (units * 0.035274)+ initialWeight -containerWeight +error; // convert values into grams    
+
+
+   
   remainings = foodWeight / intFoodPerServe;
   //Serial.println(foodWeight);
 }
 
 
-
 void getTempuratureSensorReadings(){
-  // call sensors.requestTemperatures() to issue a global temperature 
-  // request to all devices on the bus
-  //Serial.print("Requesting temperatures...");
-  sensors.requestTemperatures(); // Send the command to get temperatures
-  //Serial.println("DONE");
-  
-  // It responds almost immediately. Let's print out the data
-  printTemperature(insideThermometer); // Use a simple function to print out the data
+  sensors.requestTemperatures();
+  heatValueC = sensors.getTempCByIndex(0);
 }
-
-
-
-/*-----------------------------------------------Tempurature Sensor methods-------------------------------*/
-// function to print the temperature for a device
-void printTemperature(DeviceAddress deviceAddress){
- 
-  float tempC = sensors.getTempC(deviceAddress);
-  if(tempC == DEVICE_DISCONNECTED_C) 
-  {
-    //Serial.println("Error: Could not read temperature data");
-    return;
-  }else{
-    //It means there are sensor reading
-    if (tempC!=84){
-      heatValueC = tempC;
-      //Serial.print("Temp C: ");
-      //Serial.print(heatValueC);
-    }
-
-  }
-  
-
-
-
-  
-  
-}
-
-// function to print a device address
-void printAddress(DeviceAddress deviceAddress){
-  for (uint8_t i = 0; i < 8; i++)
-  {
-    if (deviceAddress[i] < 16) Serial.print("0");
-    Serial.print(deviceAddress[i], HEX);
-  }
-}
-
-
-/*-----------------------------------------------Tempurature Sensor setup-------------------------------*/
-void tempuratureSensorSetup(){
-  // start serial port
-  Serial.begin(9600);
-  Serial.println("Dallas Temperature IC Control Library Demo");
-  // locate devices on the bus
-  Serial.print("Locating devices...");
-  sensors.begin();
-  Serial.print("Found ");
-  Serial.print(sensors.getDeviceCount(), DEC);
-  Serial.println(" devices.");
-  // report parasite power requirements
-  Serial.print("Parasite power is: "); 
-  if (sensors.isParasitePowerMode()) Serial.println("ON");
-  else Serial.println("OFF");
-  
-  if (!sensors.getAddress(insideThermometer, 0)) Serial.println("Unable to find address for Device 0"); 
-  
-  Serial.print("Device 0 Address: ");
-  printAddress(insideThermometer);
-  Serial.println();
-  // set the resolution to 9 bit (Each Dallas/Maxim device is capable of several different resolutions)
-  sensors.setResolution(insideThermometer, 9);
- 
-  Serial.print("Device 0 Resolution: ");
-  Serial.print(sensors.getResolution(insideThermometer), DEC); 
-  Serial.println();
-}
-
 
 void clearAllScreenVariables(){
   menuMode=0;
@@ -1351,8 +1293,15 @@ void buttonActivity(){
 
   //Desktop
   if(isSaved==1 && menuMode==0 && menuSelectionOption==0 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
-   
 
+   //get tempurature sensor readings
+    getTempuratureSensorReadings();
+    //get weight sensor readings
+    getWeightSensorReadings();
+
+    //trigger feeder
+    triggerFeeder();
+    
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       //do nothin
@@ -1361,13 +1310,13 @@ void buttonActivity(){
       //do nothing
     }
     if(btnModeValue==LOW){ //Press Mode button
-      //do mothing
+      
       delay(500);
       menuMode=1;
       menuSelectionOption=1;
     }
     if(btnOkValue==LOW){  //Press Ok buton
-      delay(500);
+      //do nothing
     }
   }
 
@@ -1379,9 +1328,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       menuSelectionOption=3;
+      delay(500);
     }
     if(btnDownValue==LOW){ //Press Down button
       menuSelectionOption=2;
+      delay(500);
     }
     if(btnModeValue==LOW){ //Press Mode button
       delay(500);
@@ -1400,9 +1351,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       menuSelectionOption=1;
+      delay(500);
     }
     if(btnDownValue==LOW){ //Press Down button
       menuSelectionOption=3;
+      delay(500);
     }
     if(btnModeValue==LOW){ //Press Mode button
       delay(500);
@@ -1421,9 +1374,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       menuSelectionOption=2;
+      delay(500);
     }
     if(btnDownValue==LOW){ //Press Down button
       menuSelectionOption=1;
+      delay(500);
     }
     if(btnModeValue==LOW){ //Press Mode button
        delay(500);
@@ -2201,13 +2156,13 @@ void triggerFeeder(){
     isMinutePassed = false;
 
     prevoiusQty = remainings;
-    digitalWrite(motorPin,HIGH);
+    //digitalWrite(motorPin,HIGH);
     isMotorOn=true;
   }
 
   if(isMotorOn==true && prevoiusQty>remainings){
 
-    digitalWrite(motorPin,LOW);
+    //digitalWrite(motorPin,LOW);
     isMotorOn=false;
 
   }
@@ -2216,8 +2171,21 @@ void triggerFeeder(){
     isMinutePassed = true;
   }
 
-
+  triggerMotor(); //trigger motor due to the value
 }
+
+//method to trigger motor on and off
+void triggerMotor(){
+  if(isMotorOn==true){
+    Serial.println("here");
+    runServo();
+  }
+  
+}
+
+
+
+
 //trigger feeder sub method
 
 bool isFeederTimeArrive(){
@@ -2373,11 +2341,14 @@ bool isFilterOffTimeArrive(){
 
 
 
-
-
-
-
-
+/*--------------------- Trigger Servo -----------------------------*/
+void runServo(){
+  
+  servo.write(90);
+  delay(500);
+  servo.write(3);
+  delay(500);
+}
 
 
 /*--------------------- Trigger buzzer -----------------------------*/
