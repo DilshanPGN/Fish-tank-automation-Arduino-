@@ -133,7 +133,7 @@ uint8_t eep_calibratingFactor = 69;
 
 
 //----------------------- Variable for saving value from EEPROM --------------------------
-int intFoodPerServe=100;
+int intFoodPerServe=5;
 double calibratingFactor=-16.70;
 
 
@@ -164,11 +164,6 @@ int feedSlotHour[5]={1,01,01,01,01};
 int feedSlotMin[5]={18,30,30,30,30};
 int feedSlotsMeridiem[5] = {0,0,0,0,0};  //0=AM , 1=PM
 
-//Feed AutoCalculation
-int feedTimesPerDay = 0;
-int firstFeedTimeHour = 0;
-int firstFeedTimeMin = 0;
-int firstFeedMeridiem = 0;
 
 int manualMode = 0;
 int isSaved = 1;
@@ -187,6 +182,7 @@ void setup()
   Serial.begin(9600);
   lcd.init(); 
   lcd.backlight();
+  //Wire.setClock(10000);
   rtcUpdateWithComputer(); //initialize RTC module
   
   pinMode(btOk,INPUT_PULLUP);
@@ -204,14 +200,13 @@ void setup()
   servo.write(3);
 
   //External inturrupts
-  //attachInterrupt(digitalPinToInterrupt(btUp),buttonActivity,LOW);
+  //attachInterrupt(digitalPinToInterrupt(btMode),innterruptModeButton,LOW);
   //attachInterrupt(digitalPinToInterrupt(btDown),buttonActivity,LOW);
   
-  //writeEEPROM();
+  
   //readEEPROM();
   
-  lcd.print("Welcome");
-  lcd.clear();
+  
 
   //weight sensor setup
   scale.set_scale();
@@ -220,11 +215,14 @@ void setup()
   
   //tempurature sensor setup
   sensors.begin();
+
+  lcd.print("Welcome");
+  lcd.clear();
 }
 void loop()
 {
   
-  
+  validation();
   updateRTCVariables();
   buttonActivity();
   changeScreens();
@@ -733,27 +731,6 @@ void printSelectSetFeedMethod2(){
   lcd.print("Calculate Times>");
 }
 
-/********Calculate Times Option****/
-void printFeedTimesPerDay(){
-  lcd.setCursor(0,0);
-  lcd.print("Times Per Day:  ");    
-  lcd.setCursor(0,1);
-  lcd.print(feedTimesPerDay);
-  lcd.print(" times          ");
-}
-
-void printFeedFirstTime(){
-  lcd.setCursor(0,0);
-  lcd.print("First Time :    ");
-  lcd.setCursor(0,1);
-  lcd.print(getDigit(firstFeedTimeHour,1));
-  lcd.print(getDigit(firstFeedTimeHour,0));
-  lcd.print(":");
-  lcd.print(getDigit(firstFeedTimeMin,1));
-  lcd.print(getDigit(firstFeedTimeMin,0));
-  lcd.print(meridiemName[firstFeedMeridiem]);
-  lcd.print("         ");
-}
 
 /********Feed Scedule slot Option****/
 void printFeedSlot1Menu(){
@@ -866,18 +843,18 @@ void printSetValueFeedSlot(int slotNumber){
   if(setTimePositionFeeder==4){
     if(blinkMode==true){
       if(feedSlotsStatus[slotNumber-1]==0){ //AM
-        lcd.print("OFF    ");
+        lcd.print("OFF      ");
       }else{
-        lcd.print("ACTIVE ");
+        lcd.print("ACTIVE    ");
       }
     }else{
       lcd.print("       ");
     }
   }else{
     if(feedSlotsStatus[slotNumber-1]==0){ //AM
-      lcd.print("OFF    ");
+      lcd.print("OFF      ");
     }else{
-      lcd.print("ACTIVE ");
+      lcd.print("ACTIVE    ");
     }
   }
 
@@ -947,16 +924,9 @@ String getFeedStatus(int slotNumber){
 void writeEEPROM(){
 
 
-  EEPROM.write(eep_intFoodPerServeFisrtTwoNumbers,intFoodPerServe%100);
+  EEPROM.write(eep_intFoodPerServeFisrtTwoNumbers,((intFoodPerServe-(intFoodPerServe%100))/10));
   EEPROM.write(eep_intFoodPerServeLastTwoNumbers,intFoodPerServe%100);
-  //set clockVariables
-  //EEPROM.write(eep_hr,hr);
-  //EEPROM.write(eep_min,min);
-  //EEPROM.write(eep_sec,sec);
-  //EEPROM.write(eep_day,day);
-  //EEPROM.write(eep_month,month);
-  //EEPROM.write(eep_year,year);
-  //EEPROM.write(eep_meridiemNumberSetTime,meridiemNumberSetTime);
+ 
   //heat sensor settins
   EEPROM.write(eep_minimumTemp,minimumTemp);
   EEPROM.write(eep_heaterOffTemp,heaterOffTemp);
@@ -1012,14 +982,6 @@ void readEEPROM(){
   intFoodPerServe = (100*(EEPROM.read(eep_intFoodPerServeFisrtTwoNumbers))+(EEPROM.read(eep_intFoodPerServeLastTwoNumbers)));
   
   
-  //set clockVariables
-  //hr = EEPROM.read(eep_hr);
-  //min = EEPROM.read(eep_min);
-  //sec = EEPROM.read(eep_sec);
-  //day = EEPROM.read(eep_day);
-  //month = EEPROM.read(eep_month);
-  //year = EEPROM.read(eep_year);
-  //meridiemNumberSetTime = EEPROM.read(eep_meridiemNumberSetTime);
   //heat sensor settins
   minimumTemp = EEPROM.read(eep_minimumTemp);
   heaterOffTemp = EEPROM.read(eep_heaterOffTemp);
@@ -1398,9 +1360,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       intFoodPerServe++;
+      delay(200);
     }
     if(btnDownValue==LOW){ //Press Down button
       intFoodPerServe--;
+      delay(200);
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1422,9 +1386,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       hr++;
+      delay(200);
     }
     if(btnDownValue==LOW){ //Press Down button
       hr--;
+      delay(200);
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1441,9 +1407,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       min++;
+      delay(200);
     }
     if(btnDownValue==LOW){ //Press Down button
       min--;
+      delay(200);
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1460,9 +1428,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       sec++;
+      delay(200);
     }
     if(btnDownValue==LOW){ //Press Down button
       sec--;
+      delay(200);
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1480,9 +1450,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       meridiemNumberSetTime ++;
+      delay(200);
     }
     if(btnDownValue==LOW){ //Press Down button
       meridiemNumberSetTime --;
+      delay(200);
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1503,9 +1475,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       day++;
+      delay(200);
     }
     if(btnDownValue==LOW){ //Press Down button
       day--;
+      delay(200);
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1522,9 +1496,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       month++;
+      delay(200);
     }
     if(btnDownValue==LOW){ //Press Down button
       month--;
+      delay(200);
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1541,9 +1517,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       year++;
+      delay(200);
     }
     if(btnDownValue==LOW){ //Press Down button
       year--;
+      delay(200);
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1561,9 +1539,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       minimumTemp++;
+      delay(200);
     }
     if(btnDownValue==LOW){ //Press Down button
       minimumTemp--;
+      delay(200);
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1581,9 +1561,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       heaterOffTemp++;
+      delay(200);
     }
     if(btnDownValue==LOW){ //Press Down button
       heaterOffTemp--;
+      delay(200);
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1713,9 +1695,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       filterSlotHourFrom[menuLevel1-1]= filterSlotHourFrom[menuLevel1-1]+1;      
+      delay(200);
     }
     if(btnDownValue==LOW){ //Press Down button
-      filterSlotHourFrom[menuLevel1-1]= filterSlotHourFrom[menuLevel1-1]-1;     
+      filterSlotHourFrom[menuLevel1-1]= filterSlotHourFrom[menuLevel1-1]-1;   
+      delay(200);  
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1731,9 +1715,11 @@ void buttonActivity(){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
       filterSlotMinFrom[menuLevel1-1] = filterSlotMinFrom[menuLevel1-1]+1;      
+      delay(200);
     }
     if(btnDownValue==LOW){ //Press Down button
-      filterSlotMinFrom[menuLevel1-1] = filterSlotMinFrom[menuLevel1-1]-1;     
+      filterSlotMinFrom[menuLevel1-1] = filterSlotMinFrom[menuLevel1-1]-1;    
+      delay(200); 
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1749,10 +1735,12 @@ void buttonActivity(){
   else if(menuMode==1 && menuSelectionOption==2 && menuLevel1!=0 && menuLevel2==1 && setTimePositionFilter==3){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
-      filterSlotsMeridiemFrom[menuLevel1-1] = filterSlotsMeridiemFrom[menuLevel1-1]+1;      
+      filterSlotsMeridiemFrom[menuLevel1-1] = filterSlotsMeridiemFrom[menuLevel1-1]+1;     
+      delay(200); 
     }
     if(btnDownValue==LOW){ //Press Down button
-      filterSlotsMeridiemFrom[menuLevel1-1] = filterSlotsMeridiemFrom[menuLevel1-1]-1;     
+      filterSlotsMeridiemFrom[menuLevel1-1] = filterSlotsMeridiemFrom[menuLevel1-1]-1; 
+      delay(200);    
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1768,10 +1756,12 @@ void buttonActivity(){
   else if(menuMode==1 && menuSelectionOption==2 && menuLevel1!=0 && menuLevel2==1 && setTimePositionFilter==4){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
-      filterSlotHourTo[menuLevel1-1] = filterSlotHourTo[menuLevel1-1]+1;      
+      filterSlotHourTo[menuLevel1-1] = filterSlotHourTo[menuLevel1-1]+1;  
+      delay(200);    
     }
     if(btnDownValue==LOW){ //Press Down button
-      filterSlotHourTo[menuLevel1-1] = filterSlotHourTo[menuLevel1-1]-1;     
+      filterSlotHourTo[menuLevel1-1] = filterSlotHourTo[menuLevel1-1]-1;  
+      delay(200);   
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1787,10 +1777,12 @@ void buttonActivity(){
   else if(menuMode==1 && menuSelectionOption==2 && menuLevel1!=0 && menuLevel2==1 && setTimePositionFilter==5){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
-      filterSlotMinTo[menuLevel1-1] = filterSlotMinTo[menuLevel1-1]+1;      
+      filterSlotMinTo[menuLevel1-1] = filterSlotMinTo[menuLevel1-1]+1;    
+      delay(200);  
     }
     if(btnDownValue==LOW){ //Press Down button
       filterSlotMinTo[menuLevel1-1] = filterSlotMinTo[menuLevel1-1]-1;     
+      delay(200);
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1805,10 +1797,12 @@ void buttonActivity(){
   else if(menuMode==1 && menuSelectionOption==2 && menuLevel1!=0 && menuLevel2==1 && setTimePositionFilter==6){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
-      filterSlotsMeridiemTo[menuLevel1-1] = filterSlotsMeridiemTo[menuLevel1-1]+1;      
+      filterSlotsMeridiemTo[menuLevel1-1] = filterSlotsMeridiemTo[menuLevel1-1]+1;    
+      delay(200);  
     }
     if(btnDownValue==LOW){ //Press Down button
-      filterSlotsMeridiemTo[menuLevel1-1] = filterSlotsMeridiemTo[menuLevel1-1]-1;     
+      filterSlotsMeridiemTo[menuLevel1-1] = filterSlotsMeridiemTo[menuLevel1-1]-1;   
+      delay(200);  
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1824,10 +1818,12 @@ void buttonActivity(){
   //------------Filter Slot Active
   else if(menuMode==1 && menuSelectionOption==2 && menuLevel1!=0 && menuLevel2!=0 && menuLevel3 ==1 && setTimePositionFilter==0){
     if(btnUpValue==LOW){ //Press Up button
-      filterSlotsStatus[menuLevel2-1] = filterSlotsStatus[menuLevel2-1]+1;      
+      filterSlotsStatus[menuLevel2-1] = filterSlotsStatus[menuLevel2-1]+1;  
+      delay(200);    
     }
     if(btnDownValue==LOW){ //Press Down button
-      filterSlotsStatus[menuLevel2-1] = filterSlotsStatus[menuLevel2-1]-1;     
+      filterSlotsStatus[menuLevel2-1] = filterSlotsStatus[menuLevel2-1]-1; 
+      delay(200);    
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1959,10 +1955,12 @@ void buttonActivity(){
   else if(menuMode==1 && menuSelectionOption==3 && menuLevel1!=0 && menuLevel2==1 && setTimePositionFeeder==1){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
-      feedSlotHour[menuLevel1-1]= feedSlotHour[menuLevel1-1]+1;      
+      feedSlotHour[menuLevel1-1]= feedSlotHour[menuLevel1-1]+1;
+      delay(200);      
     }
     if(btnDownValue==LOW){ //Press Down button
-      feedSlotHour[menuLevel1-1]= feedSlotHour[menuLevel1-1]-1;     
+      feedSlotHour[menuLevel1-1]= feedSlotHour[menuLevel1-1]-1;   
+      delay(200);  
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1977,10 +1975,12 @@ void buttonActivity(){
   else if(menuMode==1 && menuSelectionOption==3 && menuLevel1!=0 && menuLevel2==1 && setTimePositionFeeder==2){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
-      feedSlotMin[menuLevel1-1] = feedSlotMin[menuLevel1-1]+1;      
+      feedSlotMin[menuLevel1-1] = feedSlotMin[menuLevel1-1]+1;   
+      delay(200);   
     }
     if(btnDownValue==LOW){ //Press Down button
-      feedSlotMin[menuLevel1-1] = feedSlotMin[menuLevel1-1]-1;     
+      feedSlotMin[menuLevel1-1] = feedSlotMin[menuLevel1-1]-1;    
+      delay(200); 
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -1996,10 +1996,12 @@ void buttonActivity(){
   else if(menuMode==1 && menuSelectionOption==3 && menuLevel1!=0 && menuLevel2==1 && setTimePositionFeeder==3){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
-      feedSlotsMeridiem[menuLevel1-1] = feedSlotsMeridiem[menuLevel1-1]+1;      
+      feedSlotsMeridiem[menuLevel1-1] = feedSlotsMeridiem[menuLevel1-1]+1;  
+      delay(200);    
     }
     if(btnDownValue==LOW){ //Press Down button
       feedSlotsMeridiem[menuLevel1-1] = feedSlotsMeridiem[menuLevel1-1]-1;     
+      delay(200);
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -2014,10 +2016,12 @@ void buttonActivity(){
   else if(menuMode==1 && menuSelectionOption==3 && menuLevel1!=0 && menuLevel2==1 && setTimePositionFeeder==4){
     //Key change
     if(btnUpValue==LOW){ //Press Up button
-      feedSlotsStatus[menuLevel1-1] = feedSlotsStatus[menuLevel1-1]+1;      
+      feedSlotsStatus[menuLevel1-1] = feedSlotsStatus[menuLevel1-1]+1; 
+      delay(200);     
     }
     if(btnDownValue==LOW){ //Press Down button
       feedSlotsStatus[menuLevel1-1] = feedSlotsStatus[menuLevel1-1]-1;     
+      delay(200);
     }
     if(btnModeValue==LOW){ //Press Mode button
       clearAllScreenVariables();
@@ -2354,8 +2358,88 @@ void runServo(){
 /*--------------------- Trigger buzzer -----------------------------*/
 void triggerBuzzer(){
   if(remainings<6 && isMotorOn){
-    digitalWrite(buzzer,HIGH);
-  }else{
-    digitalWrite(buzzer,LOW);
+    playBuzzer();
   }
+}
+
+void playBuzzer(){
+  tone(buzzer, 1000); // Send 1KHz sound signal...
+  delay(1000);        // ...for 1 sec
+  noTone(buzzer);     // Stop sound...
+  delay(1000);        // ...for 1sec
+}
+
+
+/*----------------- Intrurrupt functions---------------*/
+
+void innterruptModeButton(){
+  
+  if(isSaved==1 && menuMode==0 && menuSelectionOption==0 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){ //it means the main screen
+    if(digitalRead(btMode)==LOW){ //Press Mode button          
+      menuMode=1;
+      menuSelectionOption=1;
+    }
+  }else{
+    clearAllScreenVariables();
+  }
+}
+
+
+
+
+
+
+
+
+
+/*---------------------Validation part---------------------*/
+
+void validation(){
+  //intFoodPerServe
+
+  //food weight per serve
+  if(intFoodPerServe<0){intFoodPerServe = 1000;}else if(intFoodPerServe>1000){intFoodPerServe = 0;}
+
+  //set time variables
+  if(hr<1){hr = 12;}else if(hr>12){hr = 1;}
+  if(min<0){min = 59;}else if(min>59){min = 0;}
+  if(sec<0){sec = 59;}else if(sec>59){sec = 0;}
+  if(meridiemNumberSetTime<0){meridiemNumberSetTime = 1;}else if(meridiemNumberSetTime>1){meridiemNumberSetTime = 0;}
+
+  //set date variables
+  if(day<1){day = 31;}else if(day>31){day = 1;}
+  if(month<1){month= 12;}else if(month>12){month = 1;}
+  if(year<21){year= 40;}else if(year>40){ year = 21;}
+
+
+  //remainings
+  if(remainings<0){
+    remainings=0;
+  }
+
+
+  //validating arrays
+  for(int i = 0; i<5 ; i++){
+
+    //feeder array validation
+    if(feedSlotHour[i]<1){feedSlotHour[i]=12;}else if(feedSlotHour[i]>12){feedSlotHour[i]=1;}
+    if(feedSlotsStatus[i]<0){feedSlotsStatus[i]=1;}else if(feedSlotsStatus[i]>1){feedSlotsStatus[i]=0;}
+    if(feedSlotMin[i]<0){feedSlotMin[i]=59;}else if(feedSlotMin[i]>59){feedSlotMin[i]=0;}
+    if(feedSlotsMeridiem[i]<0){feedSlotsMeridiem[i]=1;}else if(feedSlotsMeridiem[i]>1){feedSlotsMeridiem[i]=0;}
+
+    //filter array validation
+    if(filterSlotsStatus[i]<0){filterSlotsStatus[i]=1;}else if(filterSlotsStatus[i]>1){filterSlotsStatus[i]=0;}
+    
+    if(filterSlotHourFrom[i]<1){filterSlotHourFrom[i]=12;}else if(filterSlotHourFrom[i]>12){filterSlotHourFrom[i]=1;}
+    if(filterSlotMinFrom[i]<0){filterSlotMinFrom[i]=59;}else if(filterSlotMinFrom[i]>59){filterSlotMinFrom[i]=0;}
+    if(filterSlotsMeridiemFrom[i]<0){filterSlotsMeridiemFrom[i]=1;}else if(filterSlotsMeridiemFrom[i]>1){filterSlotsMeridiemFrom[i]=0;}
+
+    if(filterSlotHourTo[i]<1){filterSlotHourTo[i]=12;}else if(filterSlotHourTo[i]>12){filterSlotHourTo[i]=1;}
+    if(filterSlotMinTo[i]<0){filterSlotMinTo[i]=59;}else if(filterSlotMinTo[i]>59){filterSlotMinTo[i]=0;}
+    if(filterSlotsMeridiemTo[i]<0){filterSlotsMeridiemTo[i]=1;}else if(filterSlotsMeridiemTo[i]>1){filterSlotsMeridiemTo[i]=0;}
+  } 
+
+
+
+  
 }
