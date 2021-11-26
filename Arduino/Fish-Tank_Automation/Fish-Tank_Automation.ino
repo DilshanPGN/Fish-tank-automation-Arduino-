@@ -126,7 +126,7 @@ int eep_feedSlotMin[5]={57,58,59,60,61};
 int eep_feedSlotsMeridiem[5] = {62,63,64,65,66};
 
 uint8_t eep_manualMode = 67;
-uint8_t eep_isSaved = 68;
+
 uint8_t eep_calibratingFactor = 69;
 
 
@@ -166,7 +166,7 @@ int feedSlotsMeridiem[5] = {0,0,0,0,0};  //0=AM , 1=PM
 
 
 int manualMode = 0;
-int isSaved = 1;
+
 
 
 //----------------------- Values from sensors --------------------------
@@ -973,7 +973,7 @@ void writeEEPROM(){
   }
 
   EEPROM.write(eep_manualMode,manualMode);
-  EEPROM.write(eep_isSaved,isSaved);
+
 }
 
 
@@ -987,45 +987,48 @@ void readEEPROM(){
   heaterOffTemp = EEPROM.read(eep_heaterOffTemp);
 
   //Filter 
-  for (int i = eep_filterSlotsStatus[0]; i<=(eep_filterSlotsStatus[4]); i++) {
-    filterSlotsStatus[i]= (EEPROM.read(i));
+  for (int i = eep_filterSlotsStatus[0],  j=0; i<=(eep_filterSlotsStatus[4])&& j<5; i++ ,j++) {
+    filterSlotsStatus[j]= (EEPROM.read(i));
   }
-  for (int i = eep_filterSlotHourFrom[0]; i<=eep_filterSlotHourFrom[4]; i++) {
-    filterSlotHourFrom[i] = (EEPROM.read(i));
+
+  for (int i = eep_filterSlotHourFrom[0] , j=0; i<=eep_filterSlotHourFrom[4]&& j<5 ; i++,j++ ) {
+    filterSlotHourFrom[j] = (EEPROM.read(i));
   }
-  for (int i = eep_filterSlotHourTo[0]; i<=eep_filterSlotHourTo[4]; i++) {
-    filterSlotHourTo[i]=(EEPROM.read(i));
+  for (int i = eep_filterSlotHourTo[0], j=0; i<=eep_filterSlotHourTo[4]&& j<5 ; i++,j++) {
+    filterSlotHourTo[j]=(EEPROM.read(i));
   }
-  for (int i = eep_filterSlotMinFrom[0] = 0; i<=eep_filterSlotMinFrom[4]; i++) {
-    filterSlotMinFrom[i]=(EEPROM.read(i));
+  for (int i = eep_filterSlotMinFrom[0] = 0, j=0; i<=eep_filterSlotMinFrom[4]&& j<5; i++,j++ ) {
+    filterSlotMinFrom[j]=(EEPROM.read(i));
   }
-  for (int i = eep_filterSlotMinTo[0]; i<=eep_filterSlotMinTo[4]; i++) {
-    filterSlotMinTo[i]=(EEPROM.read(i));
+ 
+  for (int i = eep_filterSlotMinTo[0], j=0; i<=eep_filterSlotMinTo[4]&& j<5 ; i++,j++) {
+    filterSlotMinTo[j]=(EEPROM.read(i));
   }
-  for (int i = eep_filterSlotsMeridiemFrom[0]; i<=eep_filterSlotsMeridiemFrom[4]; i++) {
-    filterSlotsMeridiemFrom[i]=(EEPROM.read(i));
+  for (int i = eep_filterSlotsMeridiemFrom[0], j=0; i<=eep_filterSlotsMeridiemFrom[4]&& j<5 ; i++,j++) {
+    filterSlotsMeridiemFrom[j]=(EEPROM.read(i));
   }
-  for (int i = eep_filterSlotsMeridiemTo[0]; i<= eep_filterSlotsMeridiemTo[4]; i++) {
-    filterSlotsMeridiemTo[i] = (EEPROM.read(i));
+  for (int i = eep_filterSlotsMeridiemTo[0],j=0; i<= eep_filterSlotsMeridiemTo[4]&& j<5 ; i++,j++) {
+    filterSlotsMeridiemTo[j] = (EEPROM.read(i));
   }
+
   
   //Feed
-  for (int i = eep_feedSlotsStatus[0]; i<= eep_feedSlotsStatus[4]; i++) {
-    feedSlotsStatus[i]= (EEPROM.read(i));
+  for (int i = eep_feedSlotsStatus[0], j=0; i<= eep_feedSlotsStatus[4]&& j<5 ; i++,j++ ) {
+    feedSlotsStatus[j]= (EEPROM.read(i));
   }
-  for (int i = eep_feedSlotHour[0]; i<=eep_feedSlotHour[4]; i++) {
-    feedSlotHour[i]= (EEPROM.read(i));
+  for (int i = eep_feedSlotHour[0], j=0; i<=eep_feedSlotHour[4]&& j<5 ; i++,j++ ) {
+    feedSlotHour[j]= (EEPROM.read(i));
   }
-  for (int i = eep_feedSlotMin[0]; i<=eep_feedSlotMin[4]; i++) {
-    feedSlotMin[i]= (EEPROM.read(i));
+  for (int i = eep_feedSlotMin[0], j=0; i<=eep_feedSlotMin[4]&& j<5 ; i++,j++ ) {
+    feedSlotMin[j]= (EEPROM.read(i));
   }
-  for (int i = eep_feedSlotsMeridiem[0]; i<=eep_feedSlotsMeridiem[4]; i++) {
-    feedSlotsMeridiem[i]= (EEPROM.read(i));
+  for (int i = eep_feedSlotsMeridiem[0], j=0; i<=eep_feedSlotsMeridiem[4]&& j<5 ; i++,j++ ) {
+    feedSlotsMeridiem[j]= (EEPROM.read(i));
   }
 
   //loading variables
   manualMode=EEPROM.read(eep_manualMode);
-  isSaved=EEPROM.read(eep_isSaved);
+  
   calibratingFactor = EEPROM.read(eep_calibratingFactor);
 }
 
@@ -1092,7 +1095,7 @@ void changeScreens(){
   
 
   //Desktop
-  if(isSaved==1 && menuMode==0 && menuSelectionOption==0 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+  if(menuMode==0 && menuSelectionOption==0 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
     printHomeScreen();
 
     
@@ -1254,7 +1257,7 @@ void buttonActivity(){
   bool btnDownValue = digitalRead(btDown);
 
   //Desktop
-  if(isSaved==1 && menuMode==0 && menuSelectionOption==0 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
+  if( menuMode==0 && menuSelectionOption==0 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){
 
    //get tempurature sensor readings
     getTempuratureSensorReadings();
@@ -2374,7 +2377,7 @@ void playBuzzer(){
 
 void innterruptModeButton(){
   
-  if(isSaved==1 && menuMode==0 && menuSelectionOption==0 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){ //it means the main screen
+  if(menuMode==0 && menuSelectionOption==0 && menuLevel1==0 && menuLevel2==0 && setTimePositionSettings==0 && setTimePositionFeeder==0){ //it means the main screen
     if(digitalRead(btMode)==LOW){ //Press Mode button          
       menuMode=1;
       menuSelectionOption=1;
